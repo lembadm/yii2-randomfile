@@ -8,6 +8,7 @@
 namespace lembadm\randomfile;
 
 use yii\base\Behavior;
+use yii\base\ErrorException;
 use yii\base\InvalidConfigException;
 use yii\base\InvalidParamException;
 use yii\db\ActiveRecord;
@@ -72,17 +73,26 @@ class RandomBehavior extends Behavior
         parent::attach($owner);
 
         if ( ! $this->attribute or ! is_string($this->attribute) ) {
-            throw new InvalidParamException("Invalid or empty \"{$this->attribute}\"");
+            throw new InvalidParamException("Invalid or empty attribute");
         }
 
         if ( ! $this->path or ! is_string($this->path) ) {
-            throw new InvalidParamException("Empty \"{$this->path}\".");
+            throw new InvalidParamException("Empty path");
         }
 
         $this->path = FileHelper::normalizePath($this->path) . DIRECTORY_SEPARATOR;
 
-        if($this->pathTo) {
+        if( $this->pathTo ) {
             $this->pathTo = FileHelper::normalizePath($this->pathTo) . DIRECTORY_SEPARATOR;
+        }
+
+        if( $this->extensions ) {
+            foreach($this->extensions as $key => $extension) {
+                $pos = strpos($extension, '/*.');
+                if($pos === false or $pos !== 0) {
+                    $this->extensions[ $key ] = '/*.' . $extension;
+                }
+            }
         }
     }
 
@@ -138,7 +148,13 @@ class RandomBehavior extends Behavior
 
         if( $this->pathTo ) {
             $destination = uniqid() . '.' . pathinfo( $source, PATHINFO_EXTENSION );
-            copy( $source, $this->pathTo . $destination );
+
+            if ( FileHelper::createDirectory( $this->pathTo ) ) {
+                copy( $source, $this->pathTo . $destination );
+            }
+            else {
+                throw new ErrorException("Can't create directory \"{ $this->pathTo }\"");
+            }
         }
         else {
             $destination = pathinfo( $source, PATHINFO_BASENAME );
